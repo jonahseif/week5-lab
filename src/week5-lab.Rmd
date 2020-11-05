@@ -81,16 +81,116 @@ t.test(chinstraps_f, chinstraps_m, alternative = "less")
 ```
 
 
+## One-way ANOVA
+
+### 1. Make a table of counts by species and sex
+
+```{r}
+penguins_count <- penguins %>% 
+  count(species, sex)
+
+penguins_count
+```
+
+We ask: Is there a significant difference in mean flipper length (mm) between the three species for **female** penguins?
+
+- Null hypothesis: There is no significant difference in mean flipper length between the three groups
+
+- Alternative hypothesis: There **is** a significant difference in mean flipper length between the three groups
+
+### 2. First, look at the distributions for female penguin flipper lengths
+
+```{r}
+penguins_f <- penguins %>% 
+  filter(sex =="female")
+
+ggplot(data = penguins_f, aes(x = flipper_length_mm)) +
+  geom_histogram(aes(fill = species),
+                 alpha = 0.5,
+                 bins = 15,
+                 show.legend = FALSE) +
+  facet_wrap(~species, scales = "free")
+  
+ggplot(data = penguins_f, aes(sample = flipper_length_mm)) +
+  geom_qq(aes(color = species),
+                 show.legend = FALSE) +
+  facet_wrap(~species, scales = "free")
+```
+
+
+### Summary statistics 
+
+Starting from penguins_f, create a summary table that groups by species, and returns the following:
+- mean of flipper length 
+- sd of flipper length 
+- sample size
+- variance `var`
+- standard error = sd / sqrt(n)
+
+```{r}
+penguins_f_summary <- penguins_f %>% 
+  group_by(species) %>% 
+  summarise(mean_flipper_mm = mean(flipper_length_mm),
+            sd_flipper_mm = sd(flipper_length_mm),
+            sample_size = n(),
+            var_flipper_mm = var(flipper_length_mm),
+            se_flipper_mm = sd(flipper_length_mm)/sqrt(n()))
+
+# Importantly, variances are pretty close (largest is < 4x greater than the smallest)
+# But we can perform a Levene's Test for equal variances anyway: 
+
+leveneTest(flipper_length_mm ~ species, data = penguins_f)
+```
+
+### 4. Make a plot of data with mean and SE indicated: 
+- Beeswarm plot with mean +- 1sd.
+
+```{r}
+ggplot()+
+  geom_beeswarm(data = penguins_f, 
+                aes(x = species, y = flipper_length_mm),
+                color = "gray70",
+                size = 3,
+                pch = 16,
+                alpha = 0.5)+
+  scale_x_discrete(labels = c("Adelie", "Chinstrap", "Gentoo")) +
+  geom_point(data = penguins_f_summary,
+             aes(x = species, y = mean_flipper_mm),
+             size = 4)+
+  geom_errorbar(data = penguins_f_summary,
+                aes(x = species,
+                    ymax = mean_flipper_mm + sd_flipper_mm,
+                    ymin = mean_flipper_mm - sd_flipper_mm),
+                color = "firebrick",
+                width = 0.1)+
+  theme_light()
+```
+
+
+### One-way ANOVA
+
+```{r}
+penguin_aov <- aov(flipper_length_mm ~ species, data = penguins_f)
+summary(penguin_aov)
+
+# We retain the alternative hypothesis (mean flipper lengths for the 3 species are NOT the same). But are they all different from each other? Or just two? 
+
+TukeyHSD(penguin_aov)
+
+# Conclusion: means for ALL pairwise combinations are significantly different
+```
+
+##### Additional: comparing to Type III ANOVA (with car package):
+Note: for unbalanced groups, you may want to do Type III ANOVA instead of Type I (they will yield the same results for balanced design, but for very unbalanced groups you probably want Type III).
+
+```{r}
+penguin_lm <- lm(flipper_length_mm ~ species, data = penguins_f)
+penguin_aov_t3 <- Anova(penguin_lm, type = "III")
+penguin_aov_t3
+```
 
 
 
-
-
-
-
-
-
-
-
+Conclusion: Mean flipper lengths differed significantly between Chinstrap (mean +/- se), Gentoo (mean +/- se), and Adelie (mean +/- se) penguins (one-way ANOVA with post-hoc Tukey's HSD, F(df) = ??, *p* < 0.05). 
 
 
